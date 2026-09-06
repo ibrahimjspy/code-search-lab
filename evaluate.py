@@ -72,7 +72,7 @@ def aggregate(results):
 
 
 def run(args):
-    data = json.loads(args.dataset.read_text())
+    data = json.loads(args.dataset.read_text(encoding='utf-8'))
     root = source_root(args.repo if args.repo is not None else
                        args.dataset.parent / data.get('source_dir', '.'))
     args.db = args.db or default_db(root)
@@ -80,7 +80,7 @@ def run(args):
     verify_labels(data, root)
     frozen_hash = file_hash(args.dataset)
     seal = args.dataset.with_suffix('.sha256')
-    if not seal.exists() or seal.read_text().strip() != frozen_hash:
+    if not seal.exists() or seal.read_text(encoding='utf-8').strip() != frozen_hash:
         raise ValueError('Dataset seal missing or changed. Freeze a new revision before evaluating.')
     con = engine.connect(args.db)
     t = time.perf_counter()
@@ -147,7 +147,7 @@ def run(args):
                            'includes_source_previews': args.include_previews},
               'summary': aggregate(results), 'queries': results}
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(report, indent=2) + '\n')
+    args.output.write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
     print(json.dumps(report['summary'], indent=2))
     con.close()
 

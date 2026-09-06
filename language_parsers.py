@@ -91,7 +91,7 @@ def parse_files(changed):
             result['files'][name] = text_records(text, suffix)
     if js:
         process = subprocess.run(['node', str(APP / 'extractor.cjs')], input=json.dumps({'files': js}),
-                                 capture_output=True, text=True)
+                                 capture_output=True, text=True, encoding='utf-8')
         if process.returncode:
             raise RuntimeError('JavaScript parser failed: ' + process.stderr[-1500:])
         parsed = json.loads(process.stdout)

@@ -85,7 +85,7 @@ class PortableBehavior(unittest.TestCase):
             self.assertFalse((root / '.index').exists())
 
     def test_platform_cache_and_interpreter_selection(self):
-        with patch.dict(os.environ, {}, clear=True):
+        with patch.dict(os.environ, {}, clear=True), patch('paths.Path.home', return_value=self.base / 'home'):
             with patch('paths.sys.platform', 'win32'), patch.dict(os.environ, {'LOCALAPPDATA': str(self.base / 'local')}):
                 self.assertEqual(paths.cache_home(), self.base / 'local' / 'code-search-lab')
                 self.assertEqual(paths.venv_python().parts[-2:], ('Scripts', 'python.exe'))
@@ -115,12 +115,30 @@ class PortableBehavior(unittest.TestCase):
             self.assertEqual([name for name, _, _ in engine.discover(self.root)], ['real.py'])
 
     def test_unicode_identifiers_are_searchable(self):
-        (self.root / 'unicode.py').write_text('def café():\n    return "coffee"\n')
+        (self.root / 'unicode.py').write_text('def café():\n    return "coffee"\n', encoding='utf-8')
         con = engine.connect(self.base / 'unicode.sqlite')
         self.addCleanup(con.close)
         engine.refresh(con, self.root)
         self.assertEqual(engine.search(con, 'café')[0]['symbol'], 'café')
         self.assertEqual(engine.search(con, 'café', mode='symbol')[0]['symbol'], 'café')
+
+    def test_configured_cache_does_not_require_home_lookup(self):
+        with patch.dict(os.environ, {}, clear=True), patch('paths.Path.home', side_effect=RuntimeError('no home')):
+            with patch('paths.sys.platform', 'win32'), patch.dict(os.environ, {'LOCALAPPDATA': str(self.base)}):
+                self.assertEqual(paths.cache_home(), self.base / 'code-search-lab')
+            with patch('paths.sys.platform', 'linux'), patch.dict(os.environ, {'XDG_CACHE_HOME': str(self.base)}):
+                self.assertEqual(paths.cache_home(), self.base / 'code-search-lab')
+
+    def test_javascript_unicode_survives_parser_wire_encoding(self):
+        from language_parsers import javascript_available
+        if not javascript_available():
+            self.skipTest('Optional TypeScript parser not installed')
+        (self.root / 'unicode.ts').write_text('class Café { ajouter() { return "été"; } }', encoding='utf-8')
+        con = engine.connect(self.base / 'js-unicode.sqlite')
+        self.addCleanup(con.close)
+        engine.refresh(con, self.root)
+        result = engine.search(con, 'Café.ajouter', mode='symbol')[0]
+        self.assertIn('été', result['preview'])
 
 
 if __name__ == '__main__':

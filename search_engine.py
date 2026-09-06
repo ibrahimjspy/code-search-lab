@@ -58,7 +58,7 @@ def discover(root):
     patterns = []
     ignore = root / '.codesearchignore'
     if ignore.is_file():
-        patterns = [line.strip() for line in ignore.read_text().splitlines()
+        patterns = [line.strip() for line in ignore.read_text(encoding='utf-8').splitlines()
                     if line.strip() and not line.lstrip().startswith('#')]
     names = None
     if shutil.which('git'):
@@ -120,7 +120,7 @@ def refresh(con, root=None):
     bound = con.execute("SELECT value FROM meta WHERE key='root'").fetchone()
     if bound and bound[0] != str(root):
         raise ValueError('Index belongs to another checkout; choose a different --db.')
-    version = sha(parser_signature() + Path(__file__).read_text())
+    version = sha(parser_signature() + Path(__file__).read_text(encoding='utf-8'))
     previous = con.execute("SELECT value FROM meta WHERE key='format'").fetchone()
     rebuild = previous is None or previous[0] != version
     old = {} if rebuild else dict(con.execute('SELECT path, digest FROM files'))

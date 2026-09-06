@@ -19,11 +19,13 @@ def cache_home():
     if override:
         return Path(override).expanduser().resolve()
     if sys.platform == 'win32':
-        base = Path(os.environ.get('LOCALAPPDATA', Path.home() / 'AppData' / 'Local'))
+        configured = os.environ.get('LOCALAPPDATA')
+        base = Path(configured) if configured else Path.home() / 'AppData' / 'Local'
     elif sys.platform == 'darwin':
         base = Path.home() / 'Library' / 'Caches'
     else:
-        base = Path(os.environ.get('XDG_CACHE_HOME', Path.home() / '.cache'))
+        configured = os.environ.get('XDG_CACHE_HOME')
+        base = Path(configured) if configured else Path.home() / '.cache'
     return base / 'code-search-lab'
 
 
