@@ -1,0 +1,6 @@
+sentence-transformers==3.4.1
+transformers==4.51.3
+torch==2.7.0
+numpy==1.26.4
+einops==0.8.2
+huggingface-hub==0.30.2

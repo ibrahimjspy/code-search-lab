@@ -1,0 +1,79 @@
+#!/usr/bin/env python3
+"""Shared terminal capability: parser, symbols, keyword/dense/hybrid retrieval."""
+import argparse
+import json
+import os
+from pathlib import Path
+import sqlite3
+import subprocess
+import sys
+import time
+from paths import source_root, default_db, venv_python
+
+LAB = Path(__file__).resolve().parent
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('command', choices=['index', 'search', 'symbol', 'embed'])
+    parser.add_argument('query', nargs='?')
+    parser.add_argument('--repo', type=Path, help='Source directory (default: current directory)')
+    parser.add_argument('--db', type=Path, help='Optional database override; default is isolated per source directory')
+    parser.add_argument('--mode', choices=['bm25', 'dense', 'hybrid'], default='bm25')
+    parser.add_argument('--limit', type=int, default=5)
+    parser.add_argument('--path', help='Repository-relative path prefix')
+    parser.add_argument('--include-docs', action='store_true')
+    parser.add_argument('--json', action='store_true')
+    args = parser.parse_args()
+    if args.command in {'search', 'symbol'} and not args.query:
+        parser.error('search/symbol requires a query')
+    if not 1 <= args.limit <= 20:
+        parser.error('--limit must be between 1 and 20')
+    needs_model = args.command == 'embed' or (args.command == 'search' and args.mode != 'bm25')
+    args.repo = source_root(args.repo)
+    args.db = args.db or default_db(args.repo)
+    venv = venv_python()
+    if needs_model and Path(sys.prefix).resolve() != (LAB / '.venv').resolve():
+        if not venv.exists():
+            raise RuntimeError('Run python setup.py --embeddings to install local embedding dependencies.')
+        os.execv(str(venv), [str(venv), str(Path(__file__).resolve()), *sys.argv[1:]])
+    from search_engine import connect, refresh, search
+    start = time.perf_counter()
+    con = connect(args.db)
+    try:
+        stats = refresh(con, args.repo)
+        refreshed = time.perf_counter()
+        results, semantic_stats = [], None
+        if args.command == 'embed':
+            from semantic import DenseIndex
+            dense = DenseIndex(con, path_filter=args.path, include_docs=args.include_docs)
+            semantic_stats = dense.stats
+        elif args.command in {'search', 'symbol'}:
+            results = search(con, args.query, args.limit, 'symbol' if args.command == 'symbol' else args.mode,
+                             args.path, args.include_docs)
+    finally:
+        con.close()
+    payload = {'repo': str(args.repo.resolve()), 'index': stats,
+               'mode': 'symbol' if args.command == 'symbol' else args.mode,
+               'refresh_ms': round((refreshed - start) * 1000),
+               'elapsed_ms': round((time.perf_counter() - start) * 1000), 'results': results}
+    if semantic_stats is not None:
+        payload['embeddings'] = semantic_stats
+    if args.json:
+        print(json.dumps(payload, indent=2))
+    else:
+        print(f"{stats['files']} files / {stats['chunks']} sections; {stats['updated']} updated; {payload['elapsed_ms']} ms")
+        for result in results:
+            print(f"\n{result['file']}:{result['start']}-{result['end']} [{result['qualified_symbol']}]")
+            for n, line in enumerate(result['preview'].splitlines(), result['preview_start']):
+                print(f'  {n}: {line}')
+        if args.command in {'search', 'symbol'} and not results:
+            print('No matches. Try another description, exact symbol, or scoped source search.')
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (ValueError, RuntimeError, OSError, sqlite3.Error, subprocess.CalledProcessError) as exc:
+        print(f'codesearch: {exc}', file=sys.stderr)
+        sys.exit(1)

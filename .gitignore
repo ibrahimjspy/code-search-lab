@@ -1,0 +1,16 @@
+.index/
+__pycache__/
+*.pyc
+node_modules/
+.venv/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.log
+.reports/
+reports/
+evaluation/*results*.json
+evaluation/*timings*.json
+.DS_Store
+Thumbs.db

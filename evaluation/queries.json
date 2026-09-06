@@ -1,0 +1,178 @@
+{
+  "schema_version": 2,
+  "source_dir": "../examples/mini-project",
+  "description": "Original synthetic retrieval smoke tests; not a production quality benchmark.",
+  "source_snapshot": {
+    "hash_algorithm": "sha256",
+    "files": {
+      "cache.py": "60f1182e5b330351ba435171a9c25d0e34b95b261a2b0986445acd76724ce624",
+      "checksum.go": "7bd5eb136aca43753ee2b7b656ab538913ece3476ba5dd629c309d9450851ec7",
+      "config.py": "d6c848fcf10d8720801fef6aad3606c63e4aa76ef33cdc3e27885029e8b5a8cd",
+      "jobs.ts": "6cc0db57ecaf0ed1a7c920ef1d9f96ca4709939d0e970715c288f2440808c5a9"
+    }
+  },
+  "queries": [
+    {
+      "id": "sample-01",
+      "query": "Where is an expired cache entry removed?",
+      "split": "development",
+      "category": "behavior",
+      "expected": [
+        {
+          "file": "cache.py",
+          "symbol": "get",
+          "qualified_symbol": "TimedCache.get",
+          "start": 14,
+          "end": 23,
+          "evidence_start": 14,
+          "evidence_end": 23,
+          "source_sha256": "60f1182e5b330351ba435171a9c25d0e34b95b261a2b0986445acd76724ce624"
+        }
+      ]
+    },
+    {
+      "id": "sample-02",
+      "query": "Where is a duplicate job identifier rejected?",
+      "split": "development",
+      "category": "validation",
+      "expected": [
+        {
+          "file": "jobs.ts",
+          "symbol": "enqueue",
+          "qualified_symbol": "JobQueue.enqueue",
+          "start": 5,
+          "end": 9,
+          "evidence_start": 5,
+          "evidence_end": 9,
+          "source_sha256": "6cc0db57ecaf0ed1a7c920ef1d9f96ca4709939d0e970715c288f2440808c5a9"
+        }
+      ]
+    },
+    {
+      "id": "sample-03",
+      "query": "Where is a nonpositive cache time to live rejected?",
+      "split": "evaluation",
+      "category": "validation",
+      "expected": [
+        {
+          "file": "cache.py",
+          "symbol": "put",
+          "qualified_symbol": "TimedCache.put",
+          "start": 8,
+          "end": 12,
+          "evidence_start": 8,
+          "evidence_end": 12,
+          "source_sha256": "60f1182e5b330351ba435171a9c25d0e34b95b261a2b0986445acd76724ce624"
+        }
+      ]
+    },
+    {
+      "id": "sample-04",
+      "query": "Where is the number of worker processes validated?",
+      "split": "evaluation",
+      "category": "validation",
+      "expected": [
+        {
+          "file": "config.py",
+          "symbol": "parse_config",
+          "qualified_symbol": "parse_config",
+          "start": 4,
+          "end": 9,
+          "evidence_start": 4,
+          "evidence_end": 9,
+          "source_sha256": "d6c848fcf10d8720801fef6aad3606c63e4aa76ef33cdc3e27885029e8b5a8cd"
+        }
+      ]
+    },
+    {
+      "id": "sample-05",
+      "query": "Where is a password removed before displaying configuration?",
+      "split": "evaluation",
+      "category": "behavior",
+      "expected": [
+        {
+          "file": "config.py",
+          "symbol": "redact_config",
+          "qualified_symbol": "redact_config",
+          "start": 12,
+          "end": 14,
+          "evidence_start": 12,
+          "evidence_end": 14,
+          "source_sha256": "d6c848fcf10d8720801fef6aad3606c63e4aa76ef33cdc3e27885029e8b5a8cd"
+        }
+      ]
+    },
+    {
+      "id": "sample-06",
+      "query": "Where can a queued job be cancelled?",
+      "split": "evaluation",
+      "category": "behavior",
+      "expected": [
+        {
+          "file": "jobs.ts",
+          "symbol": "cancel",
+          "qualified_symbol": "JobQueue.cancel",
+          "start": 11,
+          "end": 14,
+          "evidence_start": 11,
+          "evidence_end": 14,
+          "source_sha256": "6cc0db57ecaf0ed1a7c920ef1d9f96ca4709939d0e970715c288f2440808c5a9"
+        }
+      ]
+    },
+    {
+      "id": "sample-07",
+      "query": "JobQueue.take",
+      "split": "evaluation",
+      "category": "exact-symbol",
+      "expected": [
+        {
+          "file": "jobs.ts",
+          "symbol": "take",
+          "qualified_symbol": "JobQueue.take",
+          "start": 16,
+          "end": 23,
+          "evidence_start": 16,
+          "evidence_end": 23,
+          "source_sha256": "6cc0db57ecaf0ed1a7c920ef1d9f96ca4709939d0e970715c288f2440808c5a9"
+        }
+      ]
+    },
+    {
+      "id": "sample-08",
+      "query": "TimedCache.get",
+      "split": "evaluation",
+      "category": "exact-symbol",
+      "expected": [
+        {
+          "file": "cache.py",
+          "symbol": "get",
+          "qualified_symbol": "TimedCache.get",
+          "start": 14,
+          "end": 23,
+          "evidence_start": 14,
+          "evidence_end": 23,
+          "source_sha256": "60f1182e5b330351ba435171a9c25d0e34b95b261a2b0986445acd76724ce624"
+        }
+      ]
+    },
+    {
+      "id": "sample-09",
+      "query": "Where are bytes added up to compute a checksum?",
+      "split": "evaluation",
+      "category": "text-window",
+      "expected": [
+        {
+          "file": "checksum.go",
+          "symbol": "file",
+          "qualified_symbol": "file",
+          "start": 1,
+          "end": 10,
+          "evidence_start": 1,
+          "evidence_end": 10,
+          "source_sha256": "7bd5eb136aca43753ee2b7b656ab538913ece3476ba5dd629c309d9450851ec7"
+        }
+      ]
+    }
+  ]
+}

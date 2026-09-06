@@ -1,0 +1,13 @@
+{
+  "name": "code-search-lab",
+  "private": true,
+  "version": "0.3.0",
+  "description": "Local source retrieval for developers and coding agents",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ibrahimjspy/code-search-lab.git"
+  },
+  "scripts": { "test": "node test_extractor.cjs" },
+  "dependencies": { "typescript": "5.9.3" }
+}
