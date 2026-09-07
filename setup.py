@@ -13,6 +13,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--typescript', action='store_true', help='Install the optional TS/JS parser')
     parser.add_argument('--embeddings', action='store_true', help='Install the embedding environment and public model')
+    parser.add_argument('--service', action='store_true', help='Install file watching, local service and MCP dependencies')
     args = parser.parse_args()
     if args.typescript:
         npm = shutil.which('npm')
@@ -23,9 +24,13 @@ def main():
         if os.name == 'nt':
             command = [os.environ.get('COMSPEC', 'cmd.exe'), '/c', *command]
         subprocess.run(command, cwd=APP, check=True)
-    if args.embeddings:
-        venv.EnvBuilder(with_pip=True, system_site_packages=False).create(APP / '.venv')
+    if args.embeddings or args.service:
+        if not venv_python().exists():
+            venv.EnvBuilder(with_pip=True, system_site_packages=False).create(APP / '.venv')
         python = venv_python()
+        if args.service:
+            subprocess.run([str(python), '-m', 'pip', 'install', '-r', str(APP / 'requirements-service.txt')], check=True)
+    if args.embeddings:
         subprocess.run([str(python), '-m', 'pip', 'install', '-r', str(APP / 'requirements.txt')], check=True)
         code = """from huggingface_hub import snapshot_download
 import sys

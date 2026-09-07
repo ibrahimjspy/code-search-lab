@@ -34,7 +34,7 @@ def sha(text):
 def connect(db=None):
     db = Path(db) if db is not None else default_db(source_root())
     db.parent.mkdir(parents=True, exist_ok=True)
-    con = sqlite3.connect(db, timeout=60)
+    con = sqlite3.connect(db, timeout=60, check_same_thread=False)
     con.row_factory = sqlite3.Row
     con.executescript('''
       CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
@@ -50,10 +50,12 @@ def connect(db=None):
       CREATE VIRTUAL TABLE IF NOT EXISTS postings USING fts5(
         path_terms, symbol_terms, body_terms, tokenize='porter unicode61');
     ''')
+    if 'text' not in {r[1] for r in con.execute('PRAGMA table_info(files)')}:
+        con.execute('ALTER TABLE files ADD COLUMN text TEXT')
     return con
 
 
-def discover(root):
+def discover(root, only=None):
     root = source_root(root)
     patterns = []
     ignore = root / '.codesearchignore'
@@ -62,16 +64,23 @@ def discover(root):
                     if line.strip() and not line.lstrip().startswith('#')]
     names = None
     if shutil.which('git'):
-        result = subprocess.run(['git', '-C', str(root), 'ls-files', '-z', '--cached',
-                                 '--others', '--exclude-standard'], capture_output=True)
+        command = ['git', '-C', str(root), 'ls-files', '-z', '--cached', '--others', '--exclude-standard']
+        if only is not None:
+            command += ['--', *(':(literal)' + path for path in only)]
+        result = subprocess.run(command, capture_output=True)
         if result.returncode == 0:
             names = set(result.stdout.decode().split('\0')) - {''}
     if names is None:
         names = set()
-        for parent, directories, files in os.walk(root, followlinks=False):
-            directories[:] = sorted(d for d in directories if d not in SKIP_PARTS
-                                     and not (Path(parent) / d).is_symlink())
-            names.update((Path(parent) / name).relative_to(root).as_posix() for name in files)
+        starts = [root / path for path in only] if only is not None else [root]
+        for start in starts:
+            if start.is_file():
+                names.add(start.relative_to(root).as_posix())
+            elif start.is_dir() and not start.is_symlink():
+                for parent, directories, files in os.walk(start, followlinks=False):
+                    directories[:] = sorted(d for d in directories if d not in SKIP_PARTS
+                                             and not (Path(parent) / d).is_symlink())
+                    names.update((Path(parent) / name).relative_to(root).as_posix() for name in files)
     for name in sorted(names):
         p = Path(name)
         if SKIP_PARTS.intersection(p.parts) or p.name in SKIP_NAMES:
@@ -85,6 +94,8 @@ def discover(root):
         if full.is_symlink() or not full.is_file() or full.stat().st_size > 2_000_000:
             continue
         if full.resolve().is_relative_to(cache_home().resolve()):
+            continue
+        if not full.resolve().is_relative_to(root):
             continue
         data = full.read_bytes()
         if b'\0' in data:
@@ -115,7 +126,7 @@ def bounded(record):
         yield {**record, 'start': start, 'end': last_line, 'raw': ''.join(pending).rstrip()}
 
 
-def refresh(con, root=None):
+def refresh(con, root=None, only=None):
     root = source_root(root)
     bound = con.execute("SELECT value FROM meta WHERE key='root'").fetchone()
     if bound and bound[0] != str(root):
@@ -123,15 +134,31 @@ def refresh(con, root=None):
     version = sha(parser_signature() + Path(__file__).read_text(encoding='utf-8'))
     previous = con.execute("SELECT value FROM meta WHERE key='format'").fetchone()
     rebuild = previous is None or previous[0] != version
+    if rebuild:
+        only = None
+    if only is not None:
+        only = sorted(set(only))
+        if '.' in only:
+            only = None
+    if only is not None:
+        if not only:
+            return {'files': con.execute('SELECT count(*) FROM files').fetchone()[0],
+                    'chunks': con.execute('SELECT count(*) FROM records').fetchone()[0],
+                    'updated': 0, 'deleted': 0, 'scanned': 0, 'rebuilt': False, 'full_scan': False}
+        for name in only:
+            if Path(name).is_absolute() or '..' in Path(name).parts:
+                raise ValueError('Incremental paths must be source-relative.')
     old = {} if rebuild else dict(con.execute('SELECT path, digest FROM files'))
-    current = list(discover(root))
+    current = list(discover(root, only))
     changed = [(name, text, digest) for name, text, digest in current if old.get(name) != digest]
     seen = {name for name, _, _ in current}
     parsed = parse_files(changed)  # A parser failure preserves the last good index.
     if parsed['diagnostics']:
         preview = '\n'.join(f"{d['path']}:{d['line']}: {d['message']}" for d in parsed['diagnostics'][:5])
         raise RuntimeError('Source parse errors; previous index preserved.\n' + preview)
-    deleted = set(old) - seen
+    affected = set(old) if only is None else {name for name in old if any(
+        name == path or name.startswith(path.rstrip('/') + '/') for path in only)}
+    deleted = affected - seen
     with con:
         if rebuild:
             con.execute('DELETE FROM postings')
@@ -157,8 +184,9 @@ def refresh(con, root=None):
                     con.execute('INSERT INTO postings(rowid,path_terms,symbol_terms,body_terms) VALUES (?,?,?,?)',
                                 (cursor.lastrowid, ' '.join(words(name)), ' '.join(words(piece['qualified_symbol'])),
                                  ' '.join(words(piece['raw']))))
-            con.execute('INSERT OR REPLACE INTO files VALUES (?,?)', (name, digest))
-    return {'files': len(seen), 'updated': len(changed), 'deleted': len(deleted),
+            con.execute('INSERT OR REPLACE INTO files(path,digest,text) VALUES (?,?,?)', (name, digest, text))
+    return {'files': con.execute('SELECT count(*) FROM files').fetchone()[0],
+            'updated': len(changed), 'deleted': len(deleted), 'scanned': len(current), 'full_scan': only is None,
             'chunks': con.execute('SELECT count(*) FROM records').fetchone()[0],
             'extractors': [r[0] for r in con.execute('SELECT DISTINCT extractor FROM records ORDER BY extractor')],
             'rebuilt': rebuild}

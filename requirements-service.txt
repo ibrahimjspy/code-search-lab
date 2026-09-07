@@ -1,0 +1,4 @@
+watchdog==6.0.0
+mcp==1.29.1
+regex==2024.11.6
+filelock==3.18.0

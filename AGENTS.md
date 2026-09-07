@@ -24,3 +24,10 @@ Run `python -m unittest test_codesearch test_portability`. With optional
 dependencies installed, also run `npm test` and the embedding tests via the virtual
 environment's Python. Run `python evaluate.py --lexical-only` against the bundled
 synthetic dataset. Preserve the dataset seal; new labels require a new revision.
+
+Layer-one service changes additionally require `test_intelligence`, `test_service`
+and `node test_editor.cjs`. Use original synthetic source for daemon/model tests.
+Stop test services before deleting their source directories. Do not claim atomic
+filesystem freshness from an asynchronous watcher; use explicit sync paths or a
+full sync when needed. Navigation confidence and editor-buffer provenance must
+remain visible. See `docs/CODE-INTELLIGENCE.md` for the public contract.

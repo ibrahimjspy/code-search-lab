@@ -1,0 +1,28 @@
+{
+  "name": "code-search-lab-context",
+  "displayName": "Code Search Lab Context",
+  "description": "Send editor context to a local Code Search Lab service or CLI.",
+  "publisher": "ibrahimjspy",
+  "version": "0.4.0",
+  "license": "MIT",
+  "engines": { "vscode": "^1.90.0" },
+  "main": "./extension.cjs",
+  "activationEvents": ["onCommand:codeSearchLab.search", "onCommand:codeSearchLab.start"],
+  "capabilities": { "untrustedWorkspaces": { "supported": false } },
+  "contributes": {
+    "commands": [
+      { "command": "codeSearchLab.search", "title": "Code Search Lab: Search with Editor Context" },
+      { "command": "codeSearchLab.start", "title": "Code Search Lab: Start Local Service" }
+    ],
+    "configuration": {
+      "title": "Code Search Lab",
+      "properties": {
+        "codeSearchLab.cliPath": { "type": "string", "default": "", "description": "Absolute path to the codesearch Python entry point." },
+        "codeSearchLab.python": { "type": "string", "default": "python", "description": "Python executable used to launch the CLI." },
+        "codeSearchLab.mode": { "type": "string", "enum": ["auto", "bm25", "dense", "hybrid"], "default": "auto" },
+        "codeSearchLab.includeGitDiff": { "type": "boolean", "default": false },
+        "codeSearchLab.warmModel": { "type": "boolean", "default": false }
+      }
+    }
+  }
+}

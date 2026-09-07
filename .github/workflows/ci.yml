@@ -27,13 +27,15 @@ jobs:
         with:
           node-version: '22'
       - name: Install lightweight test dependency
-        run: python -m pip install numpy==1.26.4
+        run: python -m pip install numpy==1.26.4 -r requirements-service.txt
       - name: Install optional TypeScript parser
         run: python setup.py --typescript
       - name: Test retrieval, portability and vector-cache behavior
-        run: python -m unittest test_codesearch test_portability test_semantic
+        run: python -m unittest test_codesearch test_portability test_semantic test_intelligence test_service
       - name: Test TypeScript extraction
         run: npm test
+      - name: Test editor context adapter
+        run: node test_editor.cjs
       - name: Run synthetic lexical evaluation
         env:
           CODESEARCH_CACHE_DIR: ${{ runner.temp }}/codesearch-cache

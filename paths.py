@@ -30,7 +30,7 @@ def cache_home():
 
 
 def repo_cache(root):
-    identity = os.path.normcase(str(source_root(root)))
+    identity = os.path.normcase(str(Path(root).expanduser().resolve()))
     key = hashlib.sha256(identity.encode()).hexdigest()[:24]
     return cache_home() / 'repositories' / key
 
