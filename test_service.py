@@ -11,7 +11,7 @@ import unittest
 import urllib.request
 from unittest.mock import patch
 from paths import APP
-from service import start, request, descriptor, running
+from service import start, request, descriptor, running, stop
 
 
 class ServiceTests(unittest.TestCase):
@@ -26,11 +26,18 @@ class ServiceTests(unittest.TestCase):
         start(self.root)
 
     def cleanup(self):
-        if running(self.root): request(self.root,'stop')
-        deadline = time.monotonic()+10
-        while descriptor(self.root).exists() and time.monotonic()<deadline: time.sleep(.05)
+        stop(self.root)
         self.env.stop()
         self.temp.cleanup()
+
+    def test_separate_cli_stop_waits_for_process_exit(self):
+        output = subprocess.check_output([sys.executable,str(APP/'codesearch'),'stop',
+                                          '--repo',str(self.root),'--json'],text=True,encoding='utf-8')
+        self.assertTrue(json.loads(output)['stopped'])
+        self.assertFalse(descriptor(self.root).exists())
+        # Windows cannot remove this file while the child still owns its handle.
+        log = descriptor(self.root).parent/'service.log'
+        log.unlink()
 
     def test_repeated_cli_queries_share_process_and_skip_full_scans(self):
         before = request(self.root,'status')

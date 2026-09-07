@@ -43,7 +43,7 @@ def main():
         if args.require_service: parser.error('--db and --require-service cannot be combined.')
         args.local = True
     started = time.perf_counter()
-    from service import request, running, start
+    from service import request, running, start, stop
     control = args.command in {'start','mcp'}
     remote = None if args.local else running(root)
     needs_venv = control or remote is None and (args.command=='embed' or args.mode in {'dense','hybrid','regex'})
@@ -60,7 +60,7 @@ def main():
         from mcp_server import run
         run(root); return
     elif args.command=='status': payload = remote or {'running':False,'root':str(root)}
-    elif args.command=='stop': payload = request(root,'stop') if remote else {'running':False}
+    elif args.command=='stop': payload = stop(root)
     else:
         context = {}
         if args.context:

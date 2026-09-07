@@ -14,6 +14,8 @@ from paths import APP, source_root, repo_cache, venv_python
 from intelligence import Intelligence
 import search_engine as engine
 
+_children = {}
+
 
 class FileUpdates:
     def __init__(self, intelligence, reconcile_seconds=30):
@@ -150,6 +152,7 @@ def start(root, warm=False):
             'creationflags':subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS}
         child = subprocess.Popen([str(python),str(APP/'service.py'),'--repo',str(root)],
                                  stdin=subprocess.DEVNULL,stdout=log,stderr=log,cwd=APP,**kwargs)
+        _children[str(root)] = child
         threading.Thread(target=child.wait,daemon=True).start()
         log.close()
         deadline = time.monotonic()+120
@@ -162,6 +165,52 @@ def start(root, warm=False):
         else: raise TimeoutError('Service startup is still pending; inspect its private log.')
     if warm: request(root,'warm',timeout=1800)
     return request(root,'status')
+
+
+def _wait_process(pid, timeout):
+    """Wait without signaling a PID, including a daemon started by another client."""
+    if os.name=='nt':
+        import ctypes
+        from ctypes import wintypes
+        kernel = ctypes.WinDLL('kernel32',use_last_error=True)
+        kernel.OpenProcess.argtypes = [wintypes.DWORD,wintypes.BOOL,wintypes.DWORD]
+        kernel.OpenProcess.restype = wintypes.HANDLE
+        kernel.WaitForSingleObject.argtypes = [wintypes.HANDLE,wintypes.DWORD]
+        kernel.WaitForSingleObject.restype = wintypes.DWORD
+        kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+        handle = kernel.OpenProcess(0x00100000,False,pid)  # SYNCHRONIZE only.
+        if not handle:
+            if ctypes.get_last_error() in {87,1168}: return  # Already exited.
+            raise RuntimeError('Cannot confirm service process exit.')
+        try:
+            if kernel.WaitForSingleObject(handle,int(timeout*1000))!=0:
+                raise TimeoutError('Service is still stopping.')
+        finally: kernel.CloseHandle(handle)
+    else:
+        deadline = time.monotonic()+timeout
+        while time.monotonic()<deadline:
+            try: os.kill(pid,0)  # Existence probe, not a termination signal.
+            except ProcessLookupError: return
+            time.sleep(.05)
+        raise TimeoutError('Service is still stopping.')
+
+
+def stop(root, timeout=30):
+    root = Path(root).expanduser().resolve()
+    try: info = json.loads(descriptor(root).read_text(encoding='utf-8'))
+    except (FileNotFoundError,ValueError): info = None
+    if running(root): request(root,'stop')
+    child = _children.get(str(root))
+    if child is not None:
+        child.wait(timeout=timeout)
+        _children.pop(str(root),None)
+    elif info is not None:
+        _wait_process(info['pid'],timeout)
+    # Remove only this stopped instance's descriptor, never a replacement server.
+    if info and descriptor(root).exists():
+        current = json.loads(descriptor(root).read_text(encoding='utf-8'))
+        if current.get('token')==info.get('token'): descriptor(root).unlink(missing_ok=True)
+    return {'stopped':True}
 
 
 def serve(root):
